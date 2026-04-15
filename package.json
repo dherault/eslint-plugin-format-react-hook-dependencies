@@ -1,0 +1,52 @@
+{
+  "name": "eslint-plugin-format-react-hook-dependencies",
+  "version": "1.0.0",
+  "description": "An eslint plugin to format React hook dependencies in a consistent way.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dherault/eslint-plugin-format-react-hook-dependencies.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dherault/eslint-plugin-format-react-hook-dependencies/issues"
+  },
+  "homepage": "https://github.com/dherault/eslint-plugin-format-react-hook-dependencies",
+  "keywords": [
+    "eslint",
+    "eslint plugin",
+    "react",
+    "hooks",
+    "dependencies",
+    "lint",
+    "linting"
+  ],
+  "author": "David Hérault <dherault@gmail.com> (https://github.com/dherault)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "version": "auto-changelog -p && git add CHANGELOG.md",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/eslint": "^9.6.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.6.0",
+    "auto-changelog": "^2.5.0",
+    "eslint": "^10.2.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
+  },
+  "peerDependencies": {
+    "eslint": "^10.0.0"
+  }
+}
