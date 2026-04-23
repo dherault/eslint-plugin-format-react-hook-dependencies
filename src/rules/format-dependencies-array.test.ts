@@ -7,6 +7,7 @@ const ruleTester = new RuleTester()
 describe('format-dependencies-array', () => {
   ruleTester.run(`Enforce consistent usage of TypeScript type keyword in imports`, formatDependenciesArray, {
     valid: [
+      // --- useMemo ---
       {
         code: `const memo = useMemo(() => computeExpensiveValue(), [])`,
       },
@@ -56,6 +57,7 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
+      // --- useCallback ---
       {
         code: `const callback = useCallback(() => 0, [])`,
       },
@@ -105,17 +107,21 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
+      // --- useEffect ---
       {
         code: `useEffect(() => {}, [])`,
       },
+      // Single function dep
       {
         code: `useEffect(() => fetch(), [fetch])`,
       },
+      // Non-functions first (alphabetically), then functions (alphabetically)
+      // url is a non-function, fetch is a function (called in the body)
       {
-        code: `useEffect(() => fetch(url), [fetch, url])`,
+        code: `useEffect(() => fetch(url), [url, fetch])`,
       },
-       {
-        code: `useEffect(() => fetch(method, url), [fetch, method, url])`,
+      {
+        code: `useEffect(() => fetch(method, url), [method, url, fetch])`,
       },
       {
         code: `
@@ -133,24 +139,26 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
+      // url non-func first, fetch func last
       {
         code: `
         useEffect(() => {
           fetch(url)
         }, [
-          fetch,
           url,
+          fetch,
         ])
         `,
       },
+      // method, url non-funcs first (alphabetical), fetch func last
       {
         code: `
         useEffect(() => {
           fetch(method, url)
         }, [
-          fetch,
           method,
           url,
+          fetch,
         ])
         `,
       },
@@ -181,17 +189,24 @@ describe('format-dependencies-array', () => {
         errors: [{ messageId: 'formatDependenciesArray' }],
         output: `const callback = useCallback(() => c + a + b, [a, b, c])`,
       },
-      // useEffect, 2 deps unsorted
+      // useEffect: function dep (fetch) must come after non-function deps
+      // fetch is a function (called in body), url is not → correct order: [url, fetch]
       {
-        code: `useEffect(() => fetch(url), [url, fetch])`,
+        code: `useEffect(() => fetch(url), [fetch, url])`,
         errors: [{ messageId: 'formatDependenciesArray' }],
-        output: `useEffect(() => fetch(url), [fetch, url])`,
+        output: `useEffect(() => fetch(url), [url, fetch])`,
       },
-      // useEffect, 3 deps unsorted
+      // fetch is function, method & url are not → correct order: [method, url, fetch]
+      {
+        code: `useEffect(() => fetch(method, url), [fetch, method, url])`,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `useEffect(() => fetch(method, url), [method, url, fetch])`,
+      },
+      // wrong order for both grouping and alphabetical sort
       {
         code: `useEffect(() => fetch(method, url), [url, fetch, method])`,
         errors: [{ messageId: 'formatDependenciesArray' }],
-        output: `useEffect(() => fetch(method, url), [fetch, method, url])`,
+        output: `useEffect(() => fetch(method, url), [method, url, fetch])`,
       },
       // --- Multiline hook with single-line non-empty deps (should be multiline) ---
       // useMemo, 1 dep
@@ -296,7 +311,7 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
-      // useEffect, 1 dep
+      // useEffect, 1 dep (should be multiline)
       {
         code: `
         useEffect(() => {
@@ -312,7 +327,7 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
-      // useEffect, 2 deps
+      // useEffect, 2 deps: should be multiline AND reordered (url non-func first, fetch func last)
       {
         code: `
         useEffect(() => {
@@ -324,12 +339,29 @@ describe('format-dependencies-array', () => {
         useEffect(() => {
           fetch(url)
         }, [
-          fetch,
           url,
+          fetch,
         ])
         `,
       },
-      // useEffect, 3 deps
+      // useEffect, 2 deps: correct order but should be multiline
+      {
+        code: `
+        useEffect(() => {
+          fetch(url)
+        }, [url, fetch])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+        ])
+        `,
+      },
+      // useEffect, 3 deps: should be multiline AND reordered
       {
         code: `
         useEffect(() => {
@@ -341,9 +373,27 @@ describe('format-dependencies-array', () => {
         useEffect(() => {
           fetch(method, url)
         }, [
-          fetch,
           method,
           url,
+          fetch,
+        ])
+        `,
+      },
+      // useEffect, 3 deps: correct order but should be multiline
+      {
+        code: `
+        useEffect(() => {
+          fetch(method, url)
+        }, [method, url, fetch])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        useEffect(() => {
+          fetch(method, url)
+        }, [
+          method,
+          url,
+          fetch,
         ])
         `,
       },
@@ -418,24 +468,7 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
-      // useEffect, 2 deps unsorted
-      {
-        code: `
-        useEffect(() => {
-          fetch(url)
-        }, [url, fetch])
-        `,
-        errors: [{ messageId: 'formatDependenciesArray' }],
-        output: `
-        useEffect(() => {
-          fetch(url)
-        }, [
-          fetch,
-          url,
-        ])
-        `,
-      },
-      // useEffect, 3 deps unsorted
+      // useEffect, 3 deps: multiline hook, single-line deps, wrong order
       {
         code: `
         useEffect(() => {
@@ -447,9 +480,9 @@ describe('format-dependencies-array', () => {
         useEffect(() => {
           fetch(method, url)
         }, [
-          fetch,
           method,
           url,
+          fetch,
         ])
         `,
       },
@@ -538,14 +571,14 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
-      // useEffect, 2 deps
+      // useEffect, 2 deps: multiline, wrong order (fetch func should be after url non-func)
       {
         code: `
         useEffect(() => {
           fetch(url)
         }, [
-          url,
           fetch,
+          url,
         ])
         `,
         errors: [{ messageId: 'formatDependenciesArray' }],
@@ -553,12 +586,33 @@ describe('format-dependencies-array', () => {
         useEffect(() => {
           fetch(url)
         }, [
-          fetch,
           url,
+          fetch,
         ])
         `,
       },
-      // useEffect, 3 deps
+      // useEffect, 3 deps: multiline, wrong order (method, url non-funcs first, fetch func last)
+      {
+        code: `
+        useEffect(() => {
+          fetch(method, url)
+        }, [
+          fetch,
+          method,
+          url,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        useEffect(() => {
+          fetch(method, url)
+        }, [
+          method,
+          url,
+          fetch,
+        ])
+        `,
+      },
       {
         code: `
         useEffect(() => {
@@ -574,9 +628,9 @@ describe('format-dependencies-array', () => {
         useEffect(() => {
           fetch(method, url)
         }, [
-          fetch,
           method,
           url,
+          fetch,
         ])
         `,
       },

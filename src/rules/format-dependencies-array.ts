@@ -21,6 +21,37 @@ function getIndent(sourceCode: Rule.RuleContext['sourceCode'], node: Node): stri
   return line.match(/^\s*/)?.[0] ?? ''
 }
 
+// Collect all identifiers used as direct callees in CallExpressions within the given node
+function getCalledIdentifiers(node: Node): Set<string> {
+  const called = new Set<string>()
+
+  function traverse(n: unknown): void {
+    if (!n || typeof n !== 'object') return
+    const obj = n as Record<string, unknown>
+
+    if (obj.type === 'CallExpression') {
+      const callee = obj.callee as Record<string, unknown>
+      if (callee && callee.type === 'Identifier') {
+        called.add(callee.name as string)
+      }
+    }
+
+    for (const key of Object.keys(obj)) {
+      if (key === 'parent') continue
+      const val = obj[key]
+      if (Array.isArray(val)) {
+        val.forEach(item => { if (item && typeof item === 'object' && 'type' in item) traverse(item) })
+      }
+      else if (val && typeof val === 'object' && 'type' in val) {
+        traverse(val)
+      }
+    }
+  }
+
+  traverse(node)
+  return called
+}
+
 export const formatDependenciesArray: Rule.RuleModule = {
   meta: {
     type: 'suggestion',
@@ -59,12 +90,22 @@ export const formatDependenciesArray: Rule.RuleModule = {
 
         // Get the text of each dependency
         const depTexts = deps.map(dep => dep ? sourceCode.getText(dep as Node) : '')
-        const sortedDepTexts = [...depTexts].sort((a, b) => a.localeCompare(b))
+
+        // Determine which deps are called as functions in the callback body
+        const callbackArg = node.arguments[0]
+        const calledFunctions = callbackArg ? getCalledIdentifiers(callbackArg as Node) : new Set<string>()
+
+        // Sort: non-functions first (alphabetically), then functions (alphabetically)
+        const sortedDepTexts = [...depTexts].sort((a, b) => {
+          const aIsFunc = calledFunctions.has(a)
+          const bIsFunc = calledFunctions.has(b)
+          if (aIsFunc !== bIsFunc) return aIsFunc ? 1 : -1
+          return a.localeCompare(b)
+        })
 
         // Determine if the hook call (excluding deps array) is multiline
         // We check if the callback argument (first arg) is multiline
-        const callbackArg = node.arguments[0]
-        const hookIsMultiline = callbackArg ? isMultiline(callbackArg) : false
+        const hookIsMultiline = callbackArg ? isMultiline(callbackArg as Node) : false
 
         // Check if deps are already sorted
         const isSorted = depTexts.every((text, i) => text === sortedDepTexts[i])
@@ -90,7 +131,8 @@ export const formatDependenciesArray: Rule.RuleModule = {
               const elementIndent = baseIndent + '  '
               const elements = sortedDepTexts.map(text => `${elementIndent}${text},`).join('\n')
               fixedText = `[\n${elements}\n${baseIndent}]`
-            } else {
+            }
+            else {
               fixedText = `[${sortedDepTexts.join(', ')}]`
             }
 
