@@ -162,6 +162,20 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
+      // Custom function type
+      {
+        code: `
+        type Method = () => void
+        const method: Method = () => {}
+        useEffect(() => {
+          fetch(method, url)
+        }, [
+          url,
+          fetch,
+          method,
+        ])
+        `,
+      },
     ],
     invalid: [
       // --- Unsorted deps, single-line hook ---
@@ -631,6 +645,32 @@ describe('format-dependencies-array', () => {
           method,
           url,
           fetch,
+        ])
+        `,
+      },
+      // Custom function type
+      {
+        code: `
+        type Method = () => void
+        const method: Method = () => {}
+        useEffect(() => {
+          fetch(method, url)
+        }, [
+          url,
+          method,
+          fetch,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        type Method = () => void
+        const method: Method = () => {}
+        useEffect(() => {
+          fetch(method, url)
+        }, [
+          url,
+          fetch,
+          method,
         ])
         `,
       },
