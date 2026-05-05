@@ -21,6 +21,103 @@ function getIndent(sourceCode: Rule.RuleContext['sourceCode'], node: Node): stri
   return line.match(/^\s*/)?.[0] ?? ''
 }
 
+// Collect identifiers declared as functions (via initializer or TS type annotation) in the program AST
+function getDeclaredFunctionIdentifiers(programNode: Node, depNames: Set<string>): Set<string> {
+  const functions = new Set<string>()
+  // First pass: collect type alias names that resolve to function types (TSFunctionType)
+  const functionTypeAliases = new Set<string>()
+
+  function isNodeFunctionType(n: unknown): boolean {
+    if (!n || typeof n !== 'object') return false
+    const obj = n as Record<string, unknown>
+    return obj.type === 'TSFunctionType'
+  }
+
+  function traverse(n: unknown): void {
+    if (!n || typeof n !== 'object') return
+    const obj = n as Record<string, unknown>
+
+    // type Foo = () => void  →  TSTypeAliasDeclaration
+    if (obj.type === 'TSTypeAliasDeclaration') {
+      const id = obj.id as Record<string, unknown>
+      if (id && id.type === 'Identifier' && isNodeFunctionType(obj.typeAnnotation)) {
+        functionTypeAliases.add(id.name as string)
+      }
+    }
+
+    for (const key of Object.keys(obj)) {
+      if (key === 'parent') continue
+      const val = obj[key]
+      if (Array.isArray(val)) {
+        val.forEach(item => { if (item && typeof item === 'object' && 'type' in item) traverse(item) })
+      }
+      else if (val && typeof val === 'object' && 'type' in val) {
+        traverse(val)
+      }
+    }
+  }
+
+  traverse(programNode)
+
+  // Second pass: collect variables/functions that are identifiably functions
+  function traverseForFunctions(n: unknown): void {
+    if (!n || typeof n !== 'object') return
+    const obj = n as Record<string, unknown>
+
+    // function foo() {}
+    if (obj.type === 'FunctionDeclaration') {
+      const id = obj.id as Record<string, unknown> | null
+      if (id && id.type === 'Identifier' && depNames.has(id.name as string)) {
+        functions.add(id.name as string)
+      }
+    }
+
+    // const foo = () => {} | const foo = function() {} | const foo: () => void | const foo: FnAlias
+    if (obj.type === 'VariableDeclarator') {
+      const id = obj.id as Record<string, unknown>
+      const init = obj.init as Record<string, unknown> | null
+
+      if (id && id.type === 'Identifier' && depNames.has(id.name as string)) {
+        if (init && (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression')) {
+          functions.add(id.name as string)
+        }
+        else {
+          // Check TypeScript type annotation
+          const typeAnnotation = id.typeAnnotation as Record<string, unknown> | null
+          if (typeAnnotation) {
+            const inner = typeAnnotation.typeAnnotation as Record<string, unknown>
+            if (inner) {
+              if (inner.type === 'TSFunctionType') {
+                functions.add(id.name as string)
+              }
+              else if (inner.type === 'TSTypeReference') {
+                const typeName = inner.typeName as Record<string, unknown>
+                if (typeName && typeName.type === 'Identifier' && functionTypeAliases.has(typeName.name as string)) {
+                  functions.add(id.name as string)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const key of Object.keys(obj)) {
+      if (key === 'parent') continue
+      const val = obj[key]
+      if (Array.isArray(val)) {
+        val.forEach(item => { if (item && typeof item === 'object' && 'type' in item) traverseForFunctions(item) })
+      }
+      else if (val && typeof val === 'object' && 'type' in val) {
+        traverseForFunctions(val)
+      }
+    }
+  }
+
+  traverseForFunctions(programNode)
+  return functions
+}
+
 // Collect all identifiers used as direct callees in CallExpressions within the given node
 function getCalledIdentifiers(node: Node): Set<string> {
   const called = new Set<string>()
@@ -95,10 +192,14 @@ export const formatDependenciesArray: Rule.RuleModule = {
         const callbackArg = node.arguments[0]
         const calledFunctions = callbackArg ? getCalledIdentifiers(callbackArg as Node) : new Set<string>()
 
+        // Determine which deps are declared as functions in the program scope
+        const depNamesSet = new Set(depTexts)
+        const declaredFunctions = getDeclaredFunctionIdentifiers(sourceCode.ast as unknown as Node, depNamesSet)
+
         // Sort: non-functions first (alphabetically), then functions (alphabetically)
         const sortedDepTexts = [...depTexts].sort((a, b) => {
-          const aIsFunc = calledFunctions.has(a)
-          const bIsFunc = calledFunctions.has(b)
+          const aIsFunc = calledFunctions.has(a) || declaredFunctions.has(a)
+          const bIsFunc = calledFunctions.has(b) || declaredFunctions.has(b)
           if (aIsFunc !== bIsFunc) return aIsFunc ? 1 : -1
           return a.localeCompare(b)
         })

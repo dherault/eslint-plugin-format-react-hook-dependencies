@@ -1,8 +1,13 @@
 import { RuleTester } from 'eslint'
+import * as parser from '@typescript-eslint/parser'
 
 import { formatDependenciesArray } from './format-dependencies-array'
 
-const ruleTester = new RuleTester()
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parser
+  },
+})
 
 describe('format-dependencies-array', () => {
   ruleTester.run(`Enforce consistent usage of TypeScript type keyword in imports`, formatDependenciesArray, {
@@ -162,7 +167,7 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
-      // Custom function type
+      // Custom function type (type alias ref, ArrowFunctionExpression init)
       {
         code: `
         type Method = () => void
@@ -172,6 +177,88 @@ describe('format-dependencies-array', () => {
         }, [
           url,
           fetch,
+          method,
+        ])
+        `,
+      },
+      // function declaration as dependency (not called in callback)
+      {
+        code: `
+        function handleSubmit() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handleSubmit,
+        ])
+        `,
+      },
+      // FunctionExpression init
+      {
+        code: `
+        const handleSubmit = function() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handleSubmit,
+        ])
+        `,
+      },
+      // TSFunctionType annotation without initializer
+      {
+        code: `
+        let handler: () => void
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handler,
+        ])
+        `,
+      },
+      // TSFunctionType with parameters, no initializer
+      {
+        code: `
+        let onClick: (event: MouseEvent) => void
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          onClick,
+        ])
+        `,
+      },
+      // TSTypeReference to function type alias, no initializer
+      {
+        code: `
+        type EventHandler = (event: Event) => void
+        let onClick: EventHandler
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          onClick,
+        ])
+        `,
+      },
+      // Multiple typed functions — alphabetical within function group
+      {
+        code: `
+        type Method = () => void
+        const method: Method = () => {}
+        function handleSubmit() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handleSubmit,
           method,
         ])
         `,
@@ -648,7 +735,7 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
-      // Custom function type
+      // Custom function type (type alias ref, ArrowFunctionExpression init)
       {
         code: `
         type Method = () => void
@@ -670,6 +757,158 @@ describe('format-dependencies-array', () => {
         }, [
           url,
           fetch,
+          method,
+        ])
+        `,
+      },
+      // function declaration in wrong position
+      {
+        code: `
+        function handleSubmit() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          handleSubmit,
+          fetch,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        function handleSubmit() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handleSubmit,
+        ])
+        `,
+      },
+      // FunctionExpression init in wrong position
+      {
+        code: `
+        const handleSubmit = function() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          handleSubmit,
+          fetch,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        const handleSubmit = function() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handleSubmit,
+        ])
+        `,
+      },
+      // TSFunctionType annotation (no initializer) in wrong position
+      {
+        code: `
+        let handler: () => void
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          handler,
+          fetch,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        let handler: () => void
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handler,
+        ])
+        `,
+      },
+      // TSFunctionType with parameters (no initializer) in wrong position
+      {
+        code: `
+        let onClick: (event: MouseEvent) => void
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          onClick,
+          fetch,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        let onClick: (event: MouseEvent) => void
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          onClick,
+        ])
+        `,
+      },
+      // TSTypeReference to function type alias (no initializer) in wrong position
+      {
+        code: `
+        type EventHandler = (event: Event) => void
+        let onClick: EventHandler
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          onClick,
+          fetch,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        type EventHandler = (event: Event) => void
+        let onClick: EventHandler
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          onClick,
+        ])
+        `,
+      },
+      // Multiple typed functions in wrong alphabetical order within function group
+      {
+        code: `
+        type Method = () => void
+        const method: Method = () => {}
+        function handleSubmit() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          method,
+          handleSubmit,
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        type Method = () => void
+        const method: Method = () => {}
+        function handleSubmit() {}
+        useEffect(() => {
+          fetch(url)
+        }, [
+          url,
+          fetch,
+          handleSubmit,
           method,
         ])
         `,
