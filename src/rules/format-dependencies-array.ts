@@ -218,7 +218,7 @@ export const formatDependenciesArray: Rule.RuleModule = {
         const shouldBeMultiline = hookIsMultiline && deps.length > 0
 
         // No issues if already sorted and formatting is correct
-        if (isSorted && (shouldBeMultiline === arrayIsMultiline || deps.length === 0)) return
+        if (isSorted && shouldBeMultiline === arrayIsMultiline) return
 
         const baseIndent = getIndent(sourceCode, depsArray)
 

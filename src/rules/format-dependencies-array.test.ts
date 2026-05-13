@@ -913,6 +913,36 @@ describe('format-dependencies-array', () => {
         ])
         `,
       },
+      // Empty deps array should be formatted as single line
+      {
+        code: `
+        useEffect(() => {
+          fetch(url)
+        }, [
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        useEffect(() => {
+          fetch(url)
+        }, [])
+        `,
+      },
+      {
+        code: `
+        useEffect(() => {
+          fetch(url)
+        }, [
+
+        ])
+        `,
+        errors: [{ messageId: 'formatDependenciesArray' }],
+        output: `
+        useEffect(() => {
+          fetch(url)
+        }, [])
+        `,
+      },
     ],
   })
 })
