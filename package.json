@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-format-react-hook-dependencies",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "An eslint plugin to format React hook dependencies in a consistent way.",
   "license": "MIT",
   "repository": {
